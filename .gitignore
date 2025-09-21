@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+.env
+
+# Node/JS builds
+node_modules/
+dist/
+
+# Editors
+.idea/
+.vscode/
+.DS_Store
+
+# Runtime
+*.log
+.snapshots/
+coverage/
+
+# Deployment overrides
+deployment/docker/backend.env

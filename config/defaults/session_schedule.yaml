@@ -1,0 +1,38 @@
+# Default scene weighting by session (24h SGT)
+sessions:
+  - name: Asia
+    start: "07:00"
+    end: "13:00"
+    dwell_weights:
+      scene_a: 25
+      scene_b: 20
+      scene_c: 20
+      scene_d: 20
+      scene_e: 15
+  - name: Europe
+    start: "13:00"
+    end: "20:00"
+    dwell_weights:
+      scene_a: 25
+      scene_b: 25
+      scene_c: 20
+      scene_d: 15
+      scene_e: 15
+  - name: US
+    start: "20:00"
+    end: "02:00"
+    dwell_weights:
+      scene_a: 25
+      scene_b: 25
+      scene_c: 20
+      scene_d: 20
+      scene_e: 10
+  - name: Overnight
+    start: "02:00"
+    end: "07:00"
+    dwell_weights:
+      scene_a: 20
+      scene_b: 15
+      scene_c: 30
+      scene_d: 25
+      scene_e: 10

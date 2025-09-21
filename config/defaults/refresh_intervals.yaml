@@ -1,0 +1,9 @@
+# Refresh intervals in seconds by asset category.
+refresh_intervals:
+  fx: 10
+  crypto: 10
+  commodities: 60
+  indices: 30
+  rates: 120
+  calendar: 300
+  news: 45

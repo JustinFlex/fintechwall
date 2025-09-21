@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Wind Market Wallboard</title>
+    <link rel="stylesheet" href="styles/main.css" />
+  </head>
+  <body>
+    <div id="app" class="wallboard">
+      <header class="marquee" aria-label="Scrolling market highlights">
+        <div class="marquee__inner" id="marquee">
+          <span>Loading market data…</span>
+        </div>
+      </header>
+      <main class="grid">
+        <section class="column column--left">
+          <div class="panel" id="scene-a">
+            <h2>Scene A · Global Overview</h2>
+            <div class="placeholder">Awaiting data snapshot</div>
+          </div>
+          <div class="panel" id="scene-e">
+            <h2>Scene E · News Banner</h2>
+            <div class="placeholder">Headlines will appear here</div>
+          </div>
+        </section>
+        <section class="column column--center">
+          <div class="panel" id="scene-b">
+            <h2>Scene B · Equity Heat</h2>
+            <div class="placeholder">Heatmap placeholder</div>
+          </div>
+          <div class="panel" id="scene-d">
+            <h2>Scene D · Crypto Depth</h2>
+            <div class="placeholder">Crypto metrics placeholder</div>
+          </div>
+        </section>
+        <section class="column column--right">
+          <div class="panel" id="scene-c">
+            <h2>Scene C · Macro &amp; Rates</h2>
+            <div class="placeholder">Yield curves &amp; calendar placeholder</div>
+          </div>
+          <div class="panel" id="status-panel">
+            <h2>System Status</h2>
+            <dl class="status-list">
+              <div>
+                <dt>Data Mode</dt>
+                <dd id="status-data-mode">unknown</dd>
+              </div>
+              <div>
+                <dt>Last Update</dt>
+                <dd id="status-last-update">n/a</dd>
+              </div>
+            </dl>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script type="module" src="scripts/main.js"></script>
+  </body>
+</html>

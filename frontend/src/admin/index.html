@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Wallboard Configuration Console</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="../styles/admin.css" />
+  </head>
+  <body>
+    <main class="admin">
+      <header>
+        <h1>Data Source Configuration</h1>
+        <p>Select providers and override refresh cadences for each asset class.</p>
+      </header>
+
+      <section class="panel">
+        <h2>Edition</h2>
+        <label>
+          <span>Active Mode</span>
+          <select id="data-mode">
+            <option value="wind">Wind Edition</option>
+            <option value="open">Open Edition</option>
+          </select>
+        </label>
+      </section>
+
+      <section class="panel">
+        <h2>Data Providers</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Category</th>
+              <th>Primary Source</th>
+              <th>Fallback Source</th>
+            </tr>
+          </thead>
+          <tbody id="provider-table">
+            <tr>
+              <td>Indices</td>
+              <td><input /></td>
+              <td><input /></td>
+            </tr>
+            <tr>
+              <td>FX</td>
+              <td><input /></td>
+              <td><input /></td>
+            </tr>
+            <tr>
+              <td>Rates</td>
+              <td><input /></td>
+              <td><input /></td>
+            </tr>
+            <tr>
+              <td>Commodities</td>
+              <td><input /></td>
+              <td><input /></td>
+            </tr>
+            <tr>
+              <td>Crypto</td>
+              <td><input /></td>
+              <td><input /></td>
+            </tr>
+            <tr>
+              <td>Calendar</td>
+              <td><input /></td>
+              <td><input /></td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="panel">
+        <h2>Refresh Overrides</h2>
+        <div class="grid">
+          <label>FX <input type="number" min="5" value="10" /> seconds</label>
+          <label>Crypto <input type="number" min="5" value="10" /> seconds</label>
+          <label>Indices <input type="number" min="15" value="30" /> seconds</label>
+          <label>Rates <input type="number" min="60" value="120" /> seconds</label>
+          <label>Calendar <input type="number" min="60" value="300" /> seconds</label>
+          <label>News <input type="number" min="30" value="45" /> seconds</label>
+        </div>
+      </section>
+
+      <footer>
+        <button id="save-config">Save Configuration</button>
+        <span id="save-status" aria-live="polite"></span>
+      </footer>
+    </main>
+
+    <script type="module" src="./panel.js"></script>
+  </body>
+</html>
