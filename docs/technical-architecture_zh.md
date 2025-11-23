@@ -56,14 +56,13 @@
 - 数据映射层将 Wind 代码（例如 `SPX.GI`）转换为友好的 ID。
 
 ### 6.2 开放版
-- 使用 HTTP API 实现的提供程序：
-  - 用于指数和股票的雅虎财经/Stooq。
-  - 用于利率的 FRED、美国财政部、ECB、MAS。
-  - 用于加密货币的 CoinGecko (REST) 以及币安/OKX WebSocket。
-  - 用于隐含波动率的 CBOE CSV，用于概率的 CME FedWatch CSV。
-  - 通过 feedparser 进行 RSS 提取以获取新闻。
-- 通过请求限制和缓存层（ETag、`If-Modified-Since`）处理速率限制。
-- 错误包装确保跨提供程序的一致异常处理。
+- 使用纯 HTTP API 的开源数据栈：
+  - Stooq (`https://stooq.com/q/l/`) 提供全球指数、主要美股和商品（CL/GC/SI/HG/NG 等）收盘快照；当前实现采用批量 CSV 下载 + 15 秒内存缓存，避免对同一符号重复拉取造成的 10+ 秒延迟。
+  - ExchangeRate-API (`https://open.er-api.com/v6/latest/USD`) 提供公开的 FX 汇率，计算 USD/CNY、EUR/USD、USD/JPY 等交叉。
+  - FRED (`https://fred.stlouisfed.org/graph/fredgraph.csv`) 暴露的免费时间序列用于利率：例如 `DGS10`/`DGS2`（美债 10Y/2Y）、`SOFR`、`EFFR` 与 `IUDSOIA`（SONIA）。接口一次性请求最近 40 天 CSV，提取最新值与前一日差值。
+  - 宏观日历：优先使用 ForexFactory (`https://nfs.faireconomy.media/ff_calendar_thisweek.json`)，同时引入 TradingEconomics guest API (`https://api.tradingeconomics.com/calendar?c=guest:guest&format=json`) 作为备用源，二者均采用本地缓存（默认 15 分钟）避免频繁请求和 429 错误。
+- 内置重试与指数退避，超时 10 秒。若请求失败或返回 `N/D`，自动回退 Mock 数据并记录日志。
+- 可以通过 Redis（`REDIS_ENABLED`、`SNAPSHOT_CACHE_TTL`）缓存开放数据，进一步减少对公共 API 的压力。
 
 ## 7. 配置和机密
 - `config.yaml` 或环境变量指定版本模式、刷新间隔、会话计划、API 密钥。

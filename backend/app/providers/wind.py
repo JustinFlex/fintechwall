@@ -6,8 +6,10 @@ import asyncio
 import logging
 from datetime import datetime
 from typing import Any, Mapping
+import math
 
 from .base import MarketDataProvider
+from .mock import MockProvider
 
 logger = logging.getLogger(__name__)
 
@@ -15,10 +17,70 @@ logger = logging.getLogger(__name__)
 class WindProvider(MarketDataProvider):
     """Wind API provider for Chinese A-share market data."""
 
+    # Core code buckets, aligned with docs/api_specs/wind and data-api-requirements
+    INDEX_CODES = [
+        # A-share core
+        "000001.SH", "399001.SZ", "399006.SZ", "000300.SH", "000852.SH", "000016.SH", "932000.CSI", "899050.BJ",
+        # Global
+        "SPX.GI", "IXIC.GI", "NDXTMC.GI", "DJI.GI", "HSI.HI", "N225.GI", "FTSE.GI", "GDAXI.GI", "RTSI.GI",
+    ]
+    FX_CODES = [
+        "USDCNY.IB", "USDCNH.FX", "USDX.FX", "EURUSD.FX", "USDJPY.FX", "GBPUSD.FX",
+        "USDCAD.FX", "AUDUSD.FX", "NZDUSD.FX", "USDCHF.FX",
+    ]
+    POLICY_RATE_CODES = ["LPR1Y.IR", "LPR5Y.IR", "SHIBORON.IR", "SHIBOR1W.IR", "SHIBOR1M.IR", "SHIBOR3M.IR", "SHIBOR1Y.IR"]
+    GOVY_CN_CODES = ["TB1Y.WI", "TB3Y.WI", "TB5Y.WI", "TB7Y.WI", "TB10Y.WI"]
+    GOVY_US_CODES = ["UST2Y.GBM", "UST5Y.GBM", "UST10Y.GBM", "UST30Y.GBM"]
+    COMMODITY_CODES = [
+        "GC.CMX", "SI.CMX", "HG.CMX", "ALI.CMX", "CL.NYM", "PL.NYM", "NG.NYM",
+        "TA.CZC", "J.DCE", "SA.CZC", "S.CBT", "C.CBT", "W.CBT", "ZE.CBT", "LH.DCE", "RB.SHF",
+    ]
+
+    NAME_MAP = {
+        "000001.SH": "上证综指",
+        "399001.SZ": "深证成指",
+        "399006.SZ": "创业板指",
+        "000300.SH": "沪深300",
+        "000852.SH": "中证1000",
+        "000016.SH": "上证50",
+        "932000.CSI": "中证全指金融",
+        "899050.BJ": "北证50",
+        "SPX.GI": "标普500",
+        "IXIC.GI": "纳斯达克综合",
+        "NDXTMC.GI": "纳指100等权",
+        "DJI.GI": "道琼斯",
+        "HSI.HI": "恒生指数",
+        "N225.GI": "日经225",
+        "FTSE.GI": "富时100",
+        "GDAXI.GI": "德国DAX",
+        "RTSI.GI": "俄罗斯RTS",
+        "USDX.FX": "美元指数",
+    }
+
+    COMMODITY_SECTOR = {
+        "GC.CMX": "PreciousMetals",
+        "SI.CMX": "PreciousMetals",
+        "PL.NYM": "PreciousMetals",
+        "HG.CMX": "BaseMetals",
+        "ALI.CMX": "BaseMetals",
+        "CL.NYM": "Energy",
+        "NG.NYM": "Energy",
+        "TA.CZC": "Petrochemicals",
+        "J.DCE": "CoalAndSteel",
+        "SA.CZC": "Chemicals",
+        "S.CBT": "Grains",
+        "C.CBT": "Grains",
+        "W.CBT": "Grains",
+        "ZE.CBT": "Grains",
+        "LH.DCE": "Livestock",
+        "RB.SHF": "Steel",
+    }
+
     def __init__(self):
         """Initialize Wind provider with connection management."""
         self._w = None
         self._connected = False
+        self._mock = MockProvider()
         self._initialize_wind()
 
     def _initialize_wind(self) -> None:
@@ -52,259 +114,77 @@ class WindProvider(MarketDataProvider):
         return self._connected
 
     async def fetch_indices(self) -> Mapping[str, Any]:
-        """Fetch A-share market indices data from Wind API."""
+        """Fetch global + A-share indices with unified schema."""
         if not self._ensure_connection():
-            logger.warning("Wind API not available - returning demo data")
+            logger.warning("Wind API not available - returning demo indices")
             return self._get_demo_indices_data()
 
-        try:
-            # Key A-share indices - matching notebook example
-            index_codes = [
-                "000001.SH",  # 上证综指
-                "399001.SZ",  # 深证成指
-                "399006.SZ",  # 创业板指
-                "000300.SH",  # 沪深300
-                "000905.SH",  # 中证500
-                "000852.SH",  # 中证1000
-                "000016.SH",  # 上证50
-                "399005.SZ",  # 中小板指
-                "000688.SH",  # 科创50
-            ]
-
-            # Use the same fields as in the notebook example
-            fields = "rt_last,rt_pct_chg,rt_chg,rt_open,rt_high,rt_low,rt_vol,rt_amt,rt_pre_close"
-
-            logger.info(f"Fetching data for {len(index_codes)} indices...")
-
-            # Execute Wind API call in thread pool to avoid blocking
-            loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(
-                None,
-                lambda: self._w.wsq(",".join(index_codes), fields)
-            )
-
-            if result.ErrorCode != 0:
-                logger.warning(f"Real-time data fetch failed (ErrorCode: {result.ErrorCode}), trying static data...")
-                # Try static data as fallback (like in notebook)
-                result = await loop.run_in_executor(
-                    None,
-                    lambda: self._w.wss(",".join(index_codes), "close,pct_chg,chg,open,high,low,volume,amt,pre_close")
-                )
-
-                if result.ErrorCode != 0:
-                    logger.error(f"Static data also failed (ErrorCode: {result.ErrorCode})")
-                    return self._get_demo_indices_data()
-
-            # Transform data to standard format
-            indices_data = {}
-            current_time = datetime.now().isoformat()
-
-            for i, code in enumerate(index_codes):
-                if i < len(result.Data[0]):  # Ensure data exists
-                    indices_data[code] = {
-                        "code": code,
-                        "name": self._get_index_name(code),
-                        "display_name": self._get_index_name(code),
-                        "last": round(result.Data[0][i], 2) if result.Data[0][i] is not None else 0,
-                        "change_pct": round(result.Data[1][i], 2) if len(result.Data) > 1 and result.Data[1][i] is not None else 0,
-                        "change": round(result.Data[2][i], 2) if len(result.Data) > 2 and result.Data[2][i] is not None else 0,
-                        "open": round(result.Data[3][i], 2) if len(result.Data) > 3 and result.Data[3][i] is not None else 0,
-                        "high": round(result.Data[4][i], 2) if len(result.Data) > 4 and result.Data[4][i] is not None else 0,
-                        "low": round(result.Data[5][i], 2) if len(result.Data) > 5 and result.Data[5][i] is not None else 0,
-                        "volume": round(result.Data[6][i]/100000000, 2) if len(result.Data) > 6 and result.Data[6][i] is not None else 0,  # Convert to 亿 units
-                        "amount": round(result.Data[7][i]/100000000, 2) if len(result.Data) > 7 and result.Data[7][i] is not None else 0,  # Convert to 亿 units
-                        "prev_close": round(result.Data[8][i], 2) if len(result.Data) > 8 and result.Data[8][i] is not None else 0,
-                        "timestamp": current_time,
-                        "update_time": current_time
-                    }
-
-            logger.info(f"Successfully fetched {len(indices_data)} indices from Wind API")
-            return indices_data
-
-        except Exception as e:
-            logger.error(f"Error fetching indices from Wind API: {e}")
-            logger.info("Falling back to demo data")
+        fields = ["rt_last", "rt_chg", "rt_pct_chg", "rt_open", "rt_high", "rt_low", "rt_pre_close"]
+        result = await self._wsq(self.INDEX_CODES, fields)
+        if result is None or self._is_all_zero(result):
+            # Fallback to static snapshot
+            wss_fields = ["close", "pct_chg", "chg", "open", "high", "low", "pre_close"]
+            result = await self._wss(self.INDEX_CODES, wss_fields)
+            fields = wss_fields
+        if result is None:
             return self._get_demo_indices_data()
 
-    def _get_index_name(self, code: str) -> str:
-        """Get friendly name for index code."""
-        names = {
-            "000001.SH": "上证综指",
-            "399001.SZ": "深证成指",
-            "399006.SZ": "创业板指",
-            "000300.SH": "沪深300",
-            "000905.SH": "中证500",
-            "000852.SH": "中证1000",
-            "000016.SH": "上证50",
-            "399005.SZ": "中小板指",
-            "000688.SH": "科创50",
-        }
-        return names.get(code, code)
+        return self._map_price_result(self.INDEX_CODES, fields, result, include_volume=False)
 
     async def fetch_fx(self) -> Mapping[str, Any]:
         """Fetch FX data relevant to Chinese markets."""
         if not self._ensure_connection():
             return self._get_demo_fx_data()
-
-        try:
-            # Key FX pairs for Chinese markets
-            fx_codes = [
-                "USDCNY.EX",   # 美元人民币
-                "EURCNY.EX",   # 欧元人民币
-                "HKDCNY.EX",   # 港币人民币
-                "JPYCNY.EX",   # 日元人民币
-            ]
-
-            # Use consistent field format with indices
-            fields = "rt_last,rt_chg,rt_pct_chg"
-
-            loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(
-                None,
-                lambda: self._w.wsq(",".join(fx_codes), fields)
-            )
-
-            if result.ErrorCode != 0:
-                logger.warning(f"FX real-time data failed, trying static data...")
-                result = await loop.run_in_executor(
-                    None,
-                    lambda: self._w.wss(",".join(fx_codes), "close,chg,pct_chg")
-                )
-
-            if result.ErrorCode != 0:
-                logger.error(f"FX data fetch failed: {result.ErrorCode}")
-                return self._get_demo_fx_data()
-
-            fx_data = {}
-            current_time = datetime.now().isoformat()
-
-            for i, code in enumerate(fx_codes):
-                if i < len(result.Data[0]):
-                    fx_data[code] = {
-                        "code": code,
-                        "last": round(result.Data[0][i], 4) if result.Data[0][i] is not None else 0,
-                        "change": round(result.Data[1][i], 4) if len(result.Data) > 1 and result.Data[1][i] is not None else 0,
-                        "change_pct": round(result.Data[2][i], 2) if len(result.Data) > 2 and result.Data[2][i] is not None else 0,
-                        "timestamp": current_time,
-                    }
-
-            logger.info(f"Successfully fetched {len(fx_data)} FX pairs from Wind API")
-            return fx_data
-
-        except Exception as e:
-            logger.error(f"Error fetching FX data: {e}")
             return self._get_demo_fx_data()
 
+        fields = ["rt_last", "rt_chg", "rt_pct_chg"]
+        result = await self._wsq(self.FX_CODES, fields)
+        if result is None or self._is_all_zero(result):
+            wss_fields = ["close", "chg", "pct_chg"]
+            result = await self._wss(self.FX_CODES, wss_fields)
+            fields = wss_fields
+        if result is None:
+            return self._get_demo_fx_data()
+
+        return self._map_price_result(self.FX_CODES, fields, result, include_volume=False, decimals=4)
+
     async def fetch_rates(self) -> Mapping[str, Any]:
-        """Fetch interest rates and bonds data."""
+        """Fetch policy rates + CN/US govy yields."""
         if not self._ensure_connection():
             return self._get_demo_rates_data()
 
-        try:
-            # Chinese government bonds and rates
-            rate_codes = [
-                "M0000017.SH",  # 10年期国债收益率
-                "M0000025.SH",  # 5年期国债收益率
-                "M0000007.SH",  # 3年期国债收益率
-                "M0000001.SH",  # 1年期国债收益率
-            ]
-
-            # Use consistent field format
-            fields = "rt_last,rt_chg"
-
-            loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(
-                None,
-                lambda: self._w.wsq(",".join(rate_codes), fields)
-            )
-
-            if result.ErrorCode != 0:
-                logger.warning(f"Rates real-time data failed, trying static data...")
-                result = await loop.run_in_executor(
-                    None,
-                    lambda: self._w.wss(",".join(rate_codes), "close,chg")
-                )
-
-            if result.ErrorCode != 0:
-                logger.error(f"Rates data fetch failed: {result.ErrorCode}")
-                return self._get_demo_rates_data()
-
-            rates_data = {}
-            current_time = datetime.now().isoformat()
-
-            for i, code in enumerate(rate_codes):
-                if i < len(result.Data[0]):
-                    rates_data[code] = {
-                        "code": code,
-                        "last": round(result.Data[0][i], 3) if result.Data[0][i] is not None else 0,
-                        "change": round(result.Data[1][i], 3) if len(result.Data) > 1 and result.Data[1][i] is not None else 0,
-                        "timestamp": current_time,
-                    }
-
-            logger.info(f"Successfully fetched {len(rates_data)} rates from Wind API")
-            return rates_data
-
-        except Exception as e:
-            logger.error(f"Error fetching rates data: {e}")
+        rate_codes = self.POLICY_RATE_CODES + self.GOVY_CN_CODES + self.GOVY_US_CODES
+        fields = ["rt_last", "rt_chg"]
+        result = await self._wsq(rate_codes, fields)
+        if result is None or self._is_all_zero(result):
+            wss_fields = ["close", "chg"]
+            result = await self._wss(rate_codes, wss_fields)
+            fields = wss_fields
+        if result is None:
             return self._get_demo_rates_data()
+
+        return self._map_price_result(rate_codes, fields, result, include_volume=False, decimals=3)
 
     async def fetch_commodities(self) -> Mapping[str, Any]:
-        """Fetch commodities futures data from Chinese exchanges."""
+        """Fetch commodities futures snapshot (国内+海外)."""
         if not self._ensure_connection():
             return self._get_demo_commodities_data()
 
-        try:
-            # Major commodities on Chinese exchanges (verified codes)
-            commodity_codes = [
-                "RB00.SHF",     # 螺纹钢主连 (verified)
-                "I00.DCE",      # 铁矿石主连 (verified)
-                "CU00.SHF",     # 沪铜主连 (verified)
-                "AL00.SHF",     # 沪铝主连 (verified)
-                "ZN00.SHF",     # 沪锌主连 (verified)
-                "AU00.SHF",     # 沪金主连 (verified)
-                "AG00.SHF",     # 沪银主连 (verified)
-            ]
-
-            # Use consistent field format
-            fields = "rt_last,rt_chg,rt_pct_chg,rt_vol"
-
-            loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(
-                None,
-                lambda: self._w.wsq(",".join(commodity_codes), fields)
-            )
-
-            if result.ErrorCode != 0:
-                logger.warning(f"Commodities real-time data failed, trying static data...")
-                result = await loop.run_in_executor(
-                    None,
-                    lambda: self._w.wss(",".join(commodity_codes), "close,chg,pct_chg,volume")
-                )
-
-            if result.ErrorCode != 0:
-                logger.error(f"Commodities data fetch failed: {result.ErrorCode}")
-                return self._get_demo_commodities_data()
-
-            commodities_data = {}
-            current_time = datetime.now().isoformat()
-
-            for i, code in enumerate(commodity_codes):
-                if i < len(result.Data[0]):
-                    commodities_data[code] = {
-                        "code": code,
-                        "last": round(result.Data[0][i], 0) if result.Data[0][i] is not None else 0,
-                        "change": round(result.Data[1][i], 0) if len(result.Data) > 1 and result.Data[1][i] is not None else 0,
-                        "change_pct": round(result.Data[2][i], 2) if len(result.Data) > 2 and result.Data[2][i] is not None else 0,
-                        "volume": round(result.Data[3][i], 0) if len(result.Data) > 3 and result.Data[3][i] is not None else 0,
-                        "timestamp": current_time,
-                    }
-
-            logger.info(f"Successfully fetched {len(commodities_data)} commodities from Wind API")
-            return commodities_data
-
-        except Exception as e:
-            logger.error(f"Error fetching commodities data: {e}")
+        fields = ["rt_last", "rt_chg", "rt_pct_chg", "rt_vol"]
+        result = await self._wsq(self.COMMODITY_CODES, fields)
+        if result is None or self._is_all_zero(result):
+            wss_fields = ["close", "chg", "pct_chg", "pre_close", "volume"]
+            result = await self._wss(self.COMMODITY_CODES, wss_fields)
+            fields = wss_fields
+        if result is None:
             return self._get_demo_commodities_data()
+
+        data = self._map_price_result(self.COMMODITY_CODES, fields, result, include_volume=True, decimals=2)
+        # add sector if known
+        for code, item in data.items():
+            if code in self.COMMODITY_SECTOR:
+                item["sector"] = self.COMMODITY_SECTOR[code]
+        return data
 
     async def fetch_us_stocks(self) -> Mapping[str, Any]:
         """Fetch US stock market data from Wind API."""
@@ -377,6 +257,10 @@ class WindProvider(MarketDataProvider):
             logger.error(f"Error fetching US stocks data: {e}")
             return self._get_demo_us_stocks_data()
 
+    async def fetch_crypto(self) -> Mapping[str, Any]:
+        """Wind 暂缺稳定加密资产行情，返回示例数据。"""
+        return self._get_demo_crypto_data()
+
     async def fetch_calendar(self) -> list[Mapping[str, Any]]:
         """Fetch economic calendar data."""
         if not self._ensure_connection():
@@ -402,6 +286,10 @@ class WindProvider(MarketDataProvider):
         except Exception as e:
             logger.error(f"Error fetching calendar data: {e}")
             return []
+
+    async def fetch_a_share_short_term(self) -> Mapping[str, Any]:
+        """Placeholder until dedicated Wind board/flow feeds are wired."""
+        return await self._mock.fetch_a_share_short_term()
 
     def _get_demo_indices_data(self) -> Mapping[str, Any]:
         """Return demo indices data when Wind API is not available."""
@@ -476,10 +364,14 @@ class WindProvider(MarketDataProvider):
         import random
 
         rates = {
-            "M0000017.SH": 2.85,  # 10年期
-            "M0000025.SH": 2.65,  # 5年期
-            "M0000007.SH": 2.45,  # 3年期
-            "M0000001.SH": 2.25,  # 1年期
+            "M0000017.SH": 2.85,  # 中10Y
+            "M0000025.SH": 2.65,  # 中5Y
+            "M0000007.SH": 2.45,  # 中3Y
+            "M0000001.SH": 2.25,  # 中1Y
+            "UST10Y.GBM": 3.95,   # 美10Y
+            "UST2Y.GBM": 4.30,    # 美2Y
+            "LPR1Y.IR": 3.45,
+            "LPR5Y.IR": 3.95,
         }
 
         demo_data = {}
@@ -494,6 +386,114 @@ class WindProvider(MarketDataProvider):
             }
 
         return demo_data
+
+    async def _wsq(self, codes: list[str], fields: list[str]):
+        """Run wsq in executor and return result or None on error."""
+        try:
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(
+                None,
+                lambda: self._w.wsq(",".join(codes), ",".join(fields))
+            )
+            if result.ErrorCode != 0:
+                logger.error(f"Wind WSQ failed: {result.ErrorCode}")
+                return None
+            return result
+        except Exception as e:
+            logger.error(f"Wind WSQ call failed: {e}")
+            return None
+
+    async def _wss(self, codes: list[str], fields: list[str]):
+        """Run wss snapshot in executor and return result or None on error."""
+        try:
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(
+                None,
+                lambda: self._w.wss(",".join(codes), ",".join(fields))
+            )
+            if result.ErrorCode != 0:
+                logger.error(f"Wind WSS failed: {result.ErrorCode}")
+                return None
+            return result
+        except Exception as e:
+            logger.error(f"Wind WSS call failed: {e}")
+            return None
+
+    def _map_price_result(
+        self,
+        codes: list[str],
+        fields: list[str],
+        result: Any,
+        include_volume: bool = False,
+        decimals: int = 2,
+    ) -> Mapping[str, Any]:
+        """Map WSQ result to unified schema with common fields."""
+        alias = {
+            "rt_last": "last",
+            "rt_chg": "change",
+            "rt_pct_chg": "change_pct",
+            "rt_open": "open",
+            "rt_high": "high",
+            "rt_low": "low",
+            "rt_pre_close": "prev_close",
+            "rt_vol": "volume",
+            "rt_amt": "amount",
+            "close": "last",
+            "chg": "change",
+            "pct_chg": "change_pct",
+            "open": "open",
+            "high": "high",
+            "low": "low",
+            "pre_close": "prev_close",
+            "volume": "volume",
+            "amt": "amount",
+        }
+        mapped = {}
+        now = datetime.now().isoformat()
+        # result.Data is list per field in order of fields
+        for idx, code in enumerate(codes):
+            item: dict[str, Any] = {"code": code, "timestamp": now}
+            for f_index, field in enumerate(fields):
+                if f_index >= len(result.Data):
+                    continue
+                values = result.Data[f_index]
+                if idx >= len(values):
+                    continue
+                val = values[idx]
+                try:
+                    if val is None or (isinstance(val, float) and math.isnan(val)):
+                        continue
+                except Exception:
+                    continue
+                key = alias.get(field, field)
+                if key in {"last", "change", "open", "high", "low", "prev_close"}:
+                    item[key] = round(val, decimals)
+                elif key == "change_pct":
+                    item[key] = round(val, 2)
+                elif key == "volume" and include_volume:
+                    item[key] = val
+                elif key == "amount" and include_volume:
+                    item[key] = val
+            item["name"] = self.NAME_MAP.get(code, code)
+            # Derive change if missing but we have last/prev_close
+            if "change" not in item and "last" in item and "prev_close" in item and item.get("prev_close"):
+                delta = item["last"] - item["prev_close"]
+                item["change"] = round(delta, decimals)
+                if "change_pct" not in item and item["prev_close"]:
+                    item["change_pct"] = round(delta / item["prev_close"] * 100, 2)
+            mapped[code] = item
+        return mapped
+
+    @staticmethod
+    def _is_all_zero(result: Any) -> bool:
+        """Detect if result Data is all zeros (common when permission/closed)."""
+        try:
+            return all(
+                all((v or 0) == 0 for v in series)
+                for series in result.Data
+            )
+        except Exception:
+            return False
 
     def _get_demo_commodities_data(self) -> Mapping[str, Any]:
         """Return demo commodities data when Wind API is not available."""
@@ -572,6 +572,14 @@ class WindProvider(MarketDataProvider):
             }
 
         return demo_data
+
+    def _get_demo_crypto_data(self) -> Mapping[str, Any]:
+        timestamp = datetime.utcnow().isoformat()
+        return {
+            "BTC.CC": {"code": "BTC.CC", "name": "比特币", "last": 63000, "change_pct": 1.2, "timestamp": timestamp},
+            "ETH.CC": {"code": "ETH.CC", "name": "以太坊", "last": 3100, "change_pct": -0.8, "timestamp": timestamp},
+            "SOL.CC": {"code": "SOL.CC", "name": "Solana", "last": 150, "change_pct": 3.2, "timestamp": timestamp},
+        }
 
     def __del__(self):
         """Clean up Wind API connection on destruction."""

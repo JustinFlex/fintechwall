@@ -33,12 +33,19 @@ async def latest() -> Dict[str, Any]:
     data_manager = get_data_manager()
     snapshot = await data_manager.get_market_snapshot()
 
-    # Format for wallboard display
     return {
         "timestamp": snapshot["timestamp"],
+        "data_mode": snapshot.get("data_mode"),
+        "indices": snapshot.get("indices", {}),
         "a_shares": await data_manager.get_a_share_indices(),
+        "a_share_heatmap": snapshot.get("a_share_heatmap", []),
+        "a_share_short_term": snapshot.get("a_share_short_term", {}),
         "fx": snapshot.get("fx", {}),
         "commodities": snapshot.get("commodities", {}),
         "us_stocks": snapshot.get("us_stocks", {}),
+        "crypto": snapshot.get("crypto", {}),
+        "rates": snapshot.get("rates", {}),
+        "calendar": snapshot.get("calendar", {}),
+        "heatmap": snapshot.get("heatmap", []),
         "summary": snapshot.get("summary", {}),
     }

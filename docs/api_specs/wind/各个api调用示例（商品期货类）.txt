@@ -1,0 +1,1 @@
+w.wsq("GC.CMX,SI.CMX,HG.CMX,ALI.CMX,CL.NYM,PL.NYM,NG.NYM,TA.CZC,J.DCE,SA.CZC,S.CBT,C.CBT,W.CBT,ZE.CBT,LH.DCE,RB.SHF", "rt_date,rt_time,rt_pre_close,rt_high,rt_open,rt_low,rt_last,rt_last_amt,rt_last_vol,rt_latest,rt_vol,rt_amt,rt_chg,rt_pct_chg", func=DemoWSQCallback)

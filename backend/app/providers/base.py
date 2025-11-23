@@ -30,8 +30,16 @@ class MarketDataProvider(ABC):
         """Return US stock market data including indices and major stocks."""
 
     @abstractmethod
+    async def fetch_crypto(self) -> Mapping[str, Any]:
+        """Return crypto asset snapshot data."""
+
+    @abstractmethod
     async def fetch_calendar(self) -> list[Mapping[str, Any]]:
         """Return upcoming economic events."""
+
+    @abstractmethod
+    async def fetch_a_share_short_term(self) -> Mapping[str, Any]:
+        """Return short-term A-share board/flow insights."""
 
 
 class NullProvider(MarketDataProvider):
@@ -52,5 +60,11 @@ class NullProvider(MarketDataProvider):
     async def fetch_us_stocks(self) -> Mapping[str, Any]:
         return {}
 
+    async def fetch_crypto(self) -> Mapping[str, Any]:
+        return {}
+
     async def fetch_calendar(self) -> list[Mapping[str, Any]]:
         return []
+
+    async def fetch_a_share_short_term(self) -> Mapping[str, Any]:
+        return {}

@@ -260,7 +260,7 @@ body {
 .header-right {
   display: flex;
   align-items: center;
-  gap: var(--spacing-lg);
+  gap: var(--spacing-md);
 }
 
 .time-display {
@@ -292,6 +292,21 @@ body {
   font-size: 0.75rem;
   font-weight: 500;
   color: var(--market-up);
+}
+
+.status-chips {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.status-pill {
+  font-size: 0.75rem;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(0, 0, 0, 0.2);
+  color: var(--text-secondary);
 }
 
 /* Main Container */
@@ -694,6 +709,29 @@ body {
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: var(--spacing-md);
   padding: var(--spacing-lg);
+}
+.heat-cell {
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  transition: var(--transition-smooth);
+}
+.heat-cell .heat-name {
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--spacing-xs);
+}
+.heat-cell .heat-change {
+  font-size: 1.4rem;
+}
+.heat-cell.up {
+  border-color: rgba(0, 255, 136, 0.35);
+  background: rgba(0, 255, 136, 0.08);
+}
+.heat-cell.down {
+  border-color: rgba(255, 71, 87, 0.35);
+  background: rgba(255, 71, 87, 0.08);
 }
 
 /* Scene C - Macro Grid */

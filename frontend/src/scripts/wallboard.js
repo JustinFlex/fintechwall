@@ -3,7 +3,7 @@
  * Implements the carousel-based multi-scene wallboard following product requirements
  */
 
-const API_BASE = window.__WALLBOARD_API__ ?? "http://localhost:8000";
+import { API_BASE, fetchLatestSnapshot } from "./dataClient.js";
 const CAROUSEL_INTERVAL = 25_000; // default dwell time in ms
 const scenes = ["scene-a", "scene-b", "scene-c", "scene-d", "scene-e"];
 
@@ -40,7 +40,9 @@ class WallboardController {
       currentTime: document.getElementById('current-time'),
       currentSceneLabel: document.getElementById('current-scene-label'),
       connectionStatus: document.getElementById('connection-status'),
-      sceneDots: document.querySelectorAll('.dot')
+      sceneDots: document.querySelectorAll('.dot'),
+      headerDataMode: document.getElementById('data-mode-pill'),
+      headerLastUpdate: document.getElementById('last-update-pill')
     };
 
     this.startClock();
@@ -90,16 +92,13 @@ class WallboardController {
 
   async fetchSnapshot() {
     try {
-      const response = await fetch(`${API_BASE}/data/latest`);
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      const payload = await response.json();
+      const payload = await fetchLatestSnapshot();
       this.currentData = payload;
+      const ts = payload?.timestamp ? new Date(payload.timestamp) : new Date();
+      this.lastDataUpdate = ts;
       this.updateAllScenes(payload);
       this.updateStatus(payload);
       this.setConnectionStatus(true);
-      this.lastDataUpdate = new Date();
     } catch (error) {
       console.error("Failed to fetch snapshot", error);
       this.setConnectionStatus(false);
@@ -126,6 +125,7 @@ class WallboardController {
     // Equity Heat - Detailed indices view with market stats
     this.updateIndicesDetailed(data.a_shares || {});
     this.updateMarketStats(data.summary || {});
+    this.updateHeatmap(data.heatmap || []);
   }
 
   updateSceneC(data) {
@@ -142,6 +142,7 @@ class WallboardController {
   updateSceneE(data) {
     // News Banner - Market alerts and updates
     this.updateNewsBanner(data);
+    this.updateCalendar(data.calendar || {});
   }
 
   updateIndicesMini(indices) {
@@ -297,12 +298,13 @@ class WallboardController {
 
     const html = Object.entries(commodities)
       .filter(([code, data]) => data && typeof data === 'object')
-      .slice(0, 6)
+      .slice(0, 8)
       .map(([code, data]) => {
         const changeClass = this.getChangeClass(data.change_pct);
         return `
           <div class="commodity-item">
             <div class="commodity-name">${this.getCommodityName(code)}</div>
+            <div class="commodity-sector">${this.getCommoditySector(code)}</div>
             <div class="commodity-price">${this.formatNumber(data.last, 0)}</div>
             <div class="commodity-change ${changeClass}">${this.formatChange(data.change_pct)}%</div>
           </div>
@@ -315,22 +317,26 @@ class WallboardController {
   updateNewsBanner(data) {
     if (!this.elements.newsBanner) return;
 
-    const now = new Date();
-    const newsItems = [
-      { time: now.toLocaleTimeString('zh-CN'), content: 'Market data updating in real-time...' },
-      { time: now.toLocaleTimeString('zh-CN'), content: `Retrieved ${Object.keys(data.a_shares || {}).length} A-share indices` },
-      { time: now.toLocaleTimeString('zh-CN'), content: `US market ${Object.keys(data.us_stocks || {}).length} instruments normal` },
-      { time: now.toLocaleTimeString('zh-CN'), content: 'System performance optimal' }
-    ];
+    const events = (data.calendar && data.calendar.events) || [];
+    const summaries = [];
+    if (events.length) {
+      events.slice(0, 3).forEach((evt) => {
+        const time = evt.datetime ? new Date(evt.datetime).toLocaleTimeString('zh-CN') : 'N/A';
+        summaries.push({ time, content: `${evt.title || evt.event_id || ''} (${evt.country || ''})` });
+      });
+    }
+    if (!summaries.length) {
+      summaries.push({ time: new Date().toLocaleTimeString('zh-CN'), content: `数据源: ${data.data_mode || '未知'}` });
+      summaries.push({ time: new Date().toLocaleTimeString('zh-CN'), content: `A股指数: ${Object.keys(data.a_shares || {}).length} 条` });
+      summaries.push({ time: new Date().toLocaleTimeString('zh-CN'), content: `商品: ${Object.keys(data.commodities || {}).length} 条` });
+    }
 
-    const html = newsItems.map(item => `
+    this.elements.newsBanner.innerHTML = summaries.map(item => `
       <div class="news-item">
         <span class="news-time">${item.time}</span>
         <span class="news-content">${item.content}</span>
       </div>
     `).join('');
-
-    this.elements.newsBanner.innerHTML = html;
   }
 
   updateMarketStats(summary) {
@@ -361,15 +367,68 @@ class WallboardController {
     }
   }
 
+  updateHeatmap(heatmap) {
+    const container = document.getElementById('equity-heat');
+    if (!container) return;
+
+    if (!heatmap || heatmap.length === 0) {
+      container.innerHTML = '<div class="loading-spinner">No heatmap data</div>';
+      return;
+    }
+
+    const cells = heatmap.map((item) => {
+      const cls = this.getChangeClass(item.pct_change);
+      return `
+        <div class="heat-cell ${cls}">
+          <div class="heat-name">${item.name}</div>
+          <div class="heat-change">${this.formatChange(item.pct_change)}%</div>
+        </div>
+      `;
+    }).join('');
+
+    container.innerHTML = cells;
+  }
+
+  updateCalendar(calendar) {
+    const container = document.getElementById('calendar-list');
+    if (!container) return;
+
+    const events = calendar.events || [];
+    if (events.length === 0) {
+      container.innerHTML = '<div class="news-item"><span class="news-time">--</span><span class="news-content">No upcoming events</span></div>';
+      return;
+    }
+
+    const items = events.slice(0, 5).map((event) => {
+      const time = event.datetime ? new Date(event.datetime).toLocaleString('zh-CN') : "";
+      return `
+        <div class="news-item">
+          <span class="news-time">${time}</span>
+          <span class="news-content">${event.title || event.event_id || ''} (${event.country || ''})</span>
+        </div>
+      `;
+    }).join('');
+
+    container.innerHTML = items;
+  }
+
   updateStatus(data) {
-    const mode = data?.metadata?.data_mode ?? "Wind API";
+    const mode = data?.data_mode ?? data?.metadata?.data_mode ?? "mock";
     if (this.elements.statusDataMode) {
       this.elements.statusDataMode.textContent = mode;
     }
 
-    const updatedAt = new Date().toLocaleTimeString('zh-CN');
+    const updatedAt = this.lastDataUpdate
+      ? this.lastDataUpdate.toLocaleTimeString('zh-CN')
+      : new Date().toLocaleTimeString('zh-CN');
     if (this.elements.statusLastUpdate) {
       this.elements.statusLastUpdate.textContent = updatedAt;
+    }
+    if (this.elements.headerDataMode) {
+      this.elements.headerDataMode.textContent = `模式：${String(mode).toUpperCase()}`;
+    }
+    if (this.elements.headerLastUpdate) {
+      this.elements.headerLastUpdate.textContent = `更新：${updatedAt}`;
     }
 
     if (this.elements.statusConnection) {
@@ -392,6 +451,9 @@ class WallboardController {
   markStale() {
     if (this.elements.statusLastUpdate) {
       this.elements.statusLastUpdate.textContent = "stale";
+    }
+    if (this.elements.headerLastUpdate) {
+      this.elements.headerLastUpdate.textContent = "更新：暂停";
     }
   }
 
@@ -423,7 +485,11 @@ class WallboardController {
       'USDCNY.EX': 'USD/CNY',
       'EURCNY.EX': 'EUR/CNY',
       'HKDCNY.EX': 'HKD/CNY',
-      'JPYCNY.EX': 'JPY/CNY'
+      'JPYCNY.EX': 'JPY/CNY',
+      'USDCNH.FX': 'USD/CNH',
+      'EURUSD.FX': 'EUR/USD',
+      'USDJPY.FX': 'USD/JPY',
+      'USDX.FX': 'DXY'
     };
     return names[code] || code;
   }
@@ -447,22 +513,72 @@ class WallboardController {
       'M0000017.SH': '10年期国债',
       'M0000025.SH': '5年期国债',
       'M0000007.SH': '3年期国债',
-      'M0000001.SH': '1年期国债'
+      'M0000001.SH': '1年期国债',
+      'UST10Y.GBM': '美10Y',
+      'UST5Y.GBM': '美5Y',
+      'UST2Y.GBM': '美2Y',
+      'UST3M.GBM': '美3M',
+      'TB10Y.WI': '中10Y',
+      'TB5Y.WI': '中5Y',
+      'TB3Y.WI': '中3Y',
+      'TB1Y.WI': '中1Y',
+      'LPR1Y.IR': 'LPR 1Y',
+      'LPR5Y.IR': 'LPR 5Y'
     };
     return names[code] || code;
   }
 
   getCommodityName(code) {
     const names = {
-      'RB0000.SHF': '螺纹钢',
-      'I0000.DCE': '铁矿石',
-      'CU0000.SHF': '沪铜',
-      'AL0000.SHF': '沪铝',
-      'ZN0000.SHF': '沪锌',
-      'AU0000.SHF': '沪金',
-      'AG0000.SHF': '沪银'
+      'GC.CMX': 'COMEX 黄金',
+      'SI.CMX': 'COMEX 白银',
+      'HG.CMX': 'COMEX 铜',
+      'PL.NYM': 'NYMEX 铂金',
+      'PA.NYM': 'NYMEX 钯金',
+      'CL.NYM': 'WTI 原油',
+      'COIL.BR': '布伦特原油',
+      'NG.NYM': 'NYMEX 天然气',
+      'ZC.CBT': 'CBOT 玉米',
+      'ZS.CBT': 'CBOT 大豆',
+      'KC.NYB': 'ICE 咖啡',
+      'RB.SHF': '螺纹钢',
+      'RB00.SHF': '螺纹钢',
+      'I00.DCE': '铁矿石',
+      'CU00.SHF': '沪铜',
+      'AL00.SHF': '沪铝',
+      'ZN00.SHF': '沪锌',
+      'AU00.SHF': '沪金',
+      'AG00.SHF': '沪银',
+      'TA.CZC': 'PTA',
     };
     return names[code] || code;
+  }
+
+  getCommoditySector(code) {
+    const sectors = {
+      'GC.CMX': '贵金属',
+      'SI.CMX': '贵金属',
+      'PL.NYM': '贵金属',
+      'PA.NYM': '贵金属',
+      'HG.CMX': '基本金属',
+      'ALI.CMX': '基本金属',
+      'RB.SHF': '钢材',
+      'RB00.SHF': '钢材',
+      'J.DCE': '钢煤',
+      'CL.NYM': '能源',
+      'COIL.BR': '能源',
+      'NG.NYM': '能源',
+      'ZC.CBT': '农产品',
+      'ZS.CBT': '农产品',
+      'KC.NYB': '软商品',
+      'TA.CZC': '化工',
+      'SA.CZC': '化工',
+      'S.CBT': '农产品',
+      'C.CBT': '农产品',
+      'W.CBT': '农产品',
+      'LH.DCE': '畜牧',
+    };
+    return sectors[code] || '';
   }
 
   getDataFreshness() {

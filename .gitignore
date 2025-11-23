@@ -19,3 +19,5 @@ coverage/
 
 # Deployment overrides
 deployment/docker/backend.env
+
+.venv/

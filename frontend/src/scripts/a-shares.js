@@ -260,12 +260,16 @@ class ASharesWallboard {
   }
 
   updateSystemStatus(data) {
+    const mode = data?.data_mode ?? data?.metadata?.data_mode ?? 'mock';
     if (this.elements.dataSource) {
-      this.elements.dataSource.textContent = 'Wind API';
+      this.elements.dataSource.textContent = mode.toUpperCase();
     }
 
-    if (this.elements.lastUpdate && this.lastUpdateTime) {
-      this.elements.lastUpdate.textContent = this.formatTime(this.lastUpdateTime);
+    if (this.elements.lastUpdate) {
+      const label = this.lastUpdateTime
+        ? this.formatTime(this.lastUpdateTime)
+        : '--:--:--';
+      this.elements.lastUpdate.textContent = label;
     }
 
     if (this.elements.connectionStatus) {
@@ -351,6 +355,12 @@ class ASharesWallboard {
 
   getCommodityName(code) {
     const names = {
+      'GC.CMX': 'COMEX 黄金',
+      'SI.CMX': 'COMEX 白银',
+      'HG.CMX': 'COMEX 铜',
+      'CL.NYM': 'WTI 原油',
+      'COIL.BR': '布伦特原油',
+      'NG.NYM': 'NYMEX 天然气',
       'RB0000.SHF': '螺纹钢',
       'I0000.DCE': '铁矿石',
       'CU0000.SHF': '沪铜',

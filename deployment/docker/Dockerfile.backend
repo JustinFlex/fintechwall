@@ -1,8 +1,12 @@
 FROM python:3.11-slim AS base
 
-ENV PYTHONUNBUFFERED=1 \n    UV_PROJECT_ENVIRONMENT=/usr/local
+ENV PYTHONUNBUFFERED=1 \
+    UV_PROJECT_ENVIRONMENT=/usr/local
 
-RUN pip install --no-cache-dir uv \n    && apt-get update \n    && apt-get install -y --no-install-recommends build-essential \n    && rm -rf /var/lib/apt/lists/*
+RUN pip install --no-cache-dir uv \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends build-essential \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 

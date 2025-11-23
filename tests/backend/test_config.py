@@ -8,7 +8,7 @@ def test_get_and_update_config():
 
     resp = client.get("/config")
     assert resp.status_code == 200
-    assert resp.json()["data_mode"] in {"wind", "open"}
+    assert resp.json()["data_mode"] in {"wind", "open", "mock"}
 
     update = client.post("/config", json={"data_mode": "open"})
     assert update.status_code == 200

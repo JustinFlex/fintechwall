@@ -1,0 +1,16 @@
+code,name,sector
+GC.CMX,COMEX Gold,PreciousMetals
+SI.CMX,COMEX Silver,PreciousMetals
+HG.CMX,COMEX Copper,BaseMetals
+ALI.CMX,COMEX Aluminum,BaseMetals
+CL.NYM,NYMEX Crude,Energy
+NG.NYM,NYMEX NatGas,Energy
+PL.NYM,NYMEX Platinum,PreciousMetals
+TA.CZC,PTA,Petrochemicals
+J.DCE,焦炭,CoalAndSteel
+SA.CZC,纯碱,Chemicals
+S.CBT,美豆,Grains
+C.CBT,美玉米,Grains
+W.CBT,美小麦,Grains
+LH.DCE,生猪,Livestock
+RB.SHF,螺纹钢,Steel

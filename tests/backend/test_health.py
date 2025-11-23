@@ -14,5 +14,5 @@ def test_health_endpoints():
     assert ready.status_code == 200
     payload = ready.json()
     assert payload["status"] == "ok"
-    assert payload["data_mode"] in {"wind", "open"}
+    assert payload["data_mode"] in {"wind", "open", "mock"}
     assert payload["cache_enabled"] is False

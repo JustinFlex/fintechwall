@@ -1,0 +1,19 @@
+[Unit]
+Description=Open Data Wallboard Backend API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# !!! 替换为真实运行账号和路径
+User=wallboard
+Group=wallboard
+WorkingDirectory=/opt/fintech-wallboard
+EnvironmentFile=/opt/fintech-wallboard/backend/.env
+Environment=DATA_MODE=open
+ExecStart=/opt/fintech-wallboard/deployment/uv/run_backend.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

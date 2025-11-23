@@ -1,0 +1,16 @@
+[Unit]
+Description=Open Data Wallboard Frontend Static Server
+After=network-online.target
+Requires=wallboard-backend.service
+
+[Service]
+Type=simple
+User=wallboard
+Group=wallboard
+WorkingDirectory=/opt/fintech-wallboard/frontend/src
+ExecStart=/usr/bin/env python3 -m http.server 4173
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
