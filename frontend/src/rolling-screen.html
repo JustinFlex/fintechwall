@@ -33,11 +33,11 @@
                     </div>
                 </div>
             </div>
-            <div class="current-page-row">
-                <div>
-                    自动轮播 · 每场景 10 秒 | 当前场景：
-                    <span class="current-page" id="current-page-label">--</span>
+            <div class="status-row">
+                <div class="page-label">
+                    当前场景：<span class="current-page" id="current-page-label">--</span>
                 </div>
+                <div class="data-source" id="header-source">数据源：--</div>
                 <div class="page-indicator" id="page-dots"></div>
             </div>
         </header>
@@ -48,7 +48,6 @@
                 <div class="grid-2 global-grid">
                     <div class="card card-glow">
                         <div class="card-title">全球市场脉搏</div>
-                        <div class="data-source" id="global-source">数据源：--</div>
                         <div class="region-list" id="region-list">
                             <div class="region-card">正在加载区域数据...</div>
                         </div>
@@ -140,7 +139,6 @@
                 <div class="grid-2">
                     <div class="card">
                         <div class="card-title">主要利率与收益率</div>
-                        <div class="data-source" id="rates-source">数据源：--</div>
                         <div class="rates-list" id="rates-list">
                             <div class="rate-row">暂无利率数据</div>
                         </div>
@@ -163,7 +161,6 @@
                 <div class="grid-2">
                     <div class="card">
                         <div class="card-title">主力品种</div>
-                        <div class="data-source" id="commodity-source">数据源：--</div>
                         <div class="commodity-groups" id="commodity-groups">
                             <div class="commodity-group">尚无商品数据</div>
                         </div>
@@ -182,7 +179,6 @@
                 <div class="grid-2">
                     <div class="card">
                         <div class="card-title">数字资产温度</div>
-                        <div class="data-source" id="alt-source">数据源：--</div>
                         <div class="crypto-grid" id="alt-crypto">
                             <div class="loading-spinner">等待数字资产数据...</div>
                         </div>
@@ -208,7 +204,6 @@
                 <div class="grid-2">
                     <div class="countdown-card">
                         <div class="countdown-title" id="event-next-title">下一事件：待定</div>
-                        <div class="data-source" id="events-source">数据源：--</div>
                         <div class="countdown-display">
                             <div class="countdown-block">
                                 <div class="countdown-number" id="countdown-days">--</div>

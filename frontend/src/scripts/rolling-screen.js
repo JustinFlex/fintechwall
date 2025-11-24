@@ -19,6 +19,16 @@ const SCENE_NAMES = {
   "page-events": "市场大事倒计时",
 };
 
+const SCENE_SOURCE_MAP = {
+  "page-global": "global",
+  "page-ashares": "ashares",
+  "page-short": "ashares",
+  "page-macro": "rates",
+  "page-commodities": "commodities",
+  "page-alt": "alt",
+  "page-events": "events",
+};
+
 const REGION_GROUPS = [
   {
     id: "asia",
@@ -130,6 +140,7 @@ class RollingScreenController {
     this.isConnected = false;
     this.countdownTimer = null;
     this.nextEventTime = null;
+    this.dataSourceState = {};
 
     this.cache = {
       snapshot: null,
@@ -152,6 +163,7 @@ class RollingScreenController {
       dataMode: document.getElementById("meta-data-mode"),
       lastUpdate: document.getElementById("meta-last-update"),
       localClock: document.getElementById("meta-clock"),
+      headerSource: document.getElementById("header-source"),
       regionList: document.getElementById("region-list"),
       leaderboard: document.getElementById("leaderboard-body"),
       aSharesGrid: document.getElementById("ashares-grid"),
@@ -297,6 +309,8 @@ class RollingScreenController {
       this.elements.pageLabel.textContent =
         SCENE_NAMES[sceneId] ?? "未知场景";
     }
+
+    this.renderHeaderSource();
   }
 
   updateHeader(snapshot) {
@@ -310,15 +324,7 @@ class RollingScreenController {
     }
 
     if (this.elements.lastUpdate) {
-      const label = this.lastUpdate
-        ? this.lastUpdate.toLocaleTimeString("zh-CN", {
-            hour12: false,
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-          })
-        : "--:--:--";
-      this.elements.lastUpdate.textContent = label;
+      this.elements.lastUpdate.textContent = this.formatFreshnessLabel();
     }
   }
 
@@ -466,6 +472,14 @@ class RollingScreenController {
     const boardHeatmap = this.buildBoardHeatmap(snapshot?.a_share_short_term);
     const fallbackHeatmap = snapshot?.a_share_heatmap ?? [];
     this.renderHeatmap(boardHeatmap.length ? boardHeatmap : fallbackHeatmap);
+    const hasAshare =
+      (snapshot?.a_shares && Object.keys(snapshot.a_shares).length > 0) ||
+      (boardHeatmap && boardHeatmap.length > 0);
+    this.updateDataSource(
+      "ashares",
+      "开放数据 · A股指数/板块/资金榜",
+      Boolean(hasAshare)
+    );
   }
 
   renderShortTermScene(snapshot) {
@@ -497,6 +511,13 @@ class RollingScreenController {
       capitalBoards,
       "等待资金榜数据",
       { metaMode: "flow" }
+    );
+    const hasShort =
+      hotBoards.length > 0 || coldBoards.length > 0 || capitalBoards.length > 0;
+    this.updateDataSource(
+      "ashares",
+      "开放数据 · A股指数/板块/资金榜",
+      hasShort
     );
   }
 
@@ -1201,13 +1222,24 @@ class RollingScreenController {
   }
 
   updateDataSource(key, label, hasData) {
-    const el = this.elements.dataSources?.[key];
-    if (!el) return;
-    const text = `${label} | 模式 ${this.currentModeLabel()} | 更新时间 ${this.formatFreshnessLabel()}`;
-    el.textContent = hasData
-      ? text
-      : `${text} | 暂无最新数据，等待源或使用缓存`;
-    el.classList.toggle("muted", !hasData);
+    this.dataSourceState[key] = {
+      text: `${label} | 模式 ${this.currentModeLabel()} | 更新时间 ${this.formatFreshnessLabel()}`,
+      hasData,
+    };
+    this.renderHeaderSource();
+  }
+
+  renderHeaderSource() {
+    if (!this.elements.headerSource) return;
+    const sceneId = SCENES[this.pageIndex];
+    const sourceKey = SCENE_SOURCE_MAP[sceneId];
+    const state = sourceKey ? this.dataSourceState[sourceKey] : null;
+    const base = state?.text ?? `当前场景：${SCENE_NAMES[sceneId] ?? "--"} | 模式 ${this.currentModeLabel()}`;
+    const text = state
+      ? base
+      : `${base} | 数据源准备中`;
+    this.elements.headerSource.textContent = text;
+    this.elements.headerSource.classList.toggle("muted", !(state?.hasData));
   }
 
   splitValue(value) {
