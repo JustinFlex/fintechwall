@@ -1022,13 +1022,6 @@ class RollingScreenController {
     this.elements.ticker.innerHTML = items;
   }
 
-    this.updateDataSource(
-      "events",
-      "开放数据 · Nasdaq / FXStreet / ForexFactory",
-      upcomingEvents.length > 0
-    );
-  }
-
   setConnectionStatus(connected) {
     this.isConnected = connected;
     if (this.elements.connectionDot) {
