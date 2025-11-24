@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>金融市场可视化大屏 · 轮播版</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles/rolling-screen.css">
 </head>
 <body>
@@ -45,27 +45,35 @@
         <div class="pages-wrapper">
             <section class="page active" id="page-global" data-label="全球指数概览">
                 <h2 class="scene-title">全球指数概览</h2>
-                <div class="grid-2">
-                    <div class="card">
+                <div class="grid-2 global-grid">
+                    <div class="card card-glow">
                         <div class="card-title">全球市场脉搏</div>
                         <div class="region-list" id="region-list">
                             <div class="region-card">正在加载区域数据...</div>
                         </div>
                     </div>
-                    <div class="card">
-                        <div class="card-title">全球指数动能榜</div>
-                        <table class="leaderboard">
-                            <thead>
-                                <tr>
-                                    <th>指数</th>
-                                    <th>最新</th>
-                                    <th>涨跌%</th>
-                                </tr>
-                            </thead>
-                            <tbody id="leaderboard-body">
-                                <tr><td colspan="3">正在加载...</td></tr>
-                            </tbody>
-                        </table>
+                    <div class="stack-column">
+                        <div class="card card-compact">
+                            <div class="card-title">全球指数动能榜</div>
+                            <table class="leaderboard">
+                                <thead>
+                                    <tr>
+                                        <th>指数</th>
+                                        <th>最新</th>
+                                        <th>涨跌%</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="leaderboard-body">
+                                    <tr><td colspan="3">正在加载...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="card card-compact">
+                            <div class="card-title">美股焦点</div>
+                            <div class="board-list" id="us-focus-list">
+                                <div class="board-item">等待美股数据...</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -176,9 +184,9 @@
                         </div>
                     </div>
                     <div class="card">
-                        <div class="card-title">跨市场风向</div>
-                        <div class="board-list" id="alt-us-stocks">
-                            <div class="board-item">等待美股数据...</div>
+                        <div class="card-title">大宗与避险信号</div>
+                        <div class="board-list" id="alt-commodities">
+                            <div class="board-item">等待大宗/避险数据...</div>
                         </div>
                         <div class="mini-section-title">主要汇率</div>
                         <div class="fx-mini-grid" id="alt-fx">

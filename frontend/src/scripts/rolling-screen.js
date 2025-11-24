@@ -50,6 +50,7 @@ const RATE_LABELS = {
   "M0000007.SH": "中国国债3Y",
   "M0000001.SH": "中国国债1Y",
   "UST10Y.GBM": "美债10Y",
+  "UST5Y.GBM": "美债5Y",
   "UST2Y.GBM": "美债2Y",
   "UST3M.GBM": "美债3M",
   "TB10Y.WI": "国开10Y",
@@ -160,6 +161,7 @@ class RollingScreenController {
         unchanged: document.getElementById("metric-unchanged"),
       },
       heatmap: document.getElementById("heatmap-grid"),
+      usFocus: document.getElementById("us-focus-list"),
       ticker: document.getElementById("ticker-track"),
       connectionDot: document.getElementById("connection-dot"),
       connectionText: document.getElementById("connection-text"),
@@ -173,7 +175,7 @@ class RollingScreenController {
       commodityNotes: document.getElementById("commodity-notes"),
       altCrypto: document.getElementById("alt-crypto"),
       altFx: document.getElementById("alt-fx"),
-      altUs: document.getElementById("alt-us-stocks"),
+      altCommodities: document.getElementById("alt-commodities"),
       altSummary: document.getElementById("alt-summary"),
       countdownTitle: document.getElementById("event-next-title"),
       countdownMeta: document.getElementById("countdown-meta"),
@@ -226,7 +228,11 @@ class RollingScreenController {
     try {
       const snapshot = await fetchLatestSnapshot();
       this.cache.snapshot = snapshot;
-      this.lastUpdate = new Date();
+      const snapshotTime = snapshot?.timestamp ? new Date(snapshot.timestamp) : null;
+      this.lastUpdate =
+        snapshotTime && !Number.isNaN(snapshotTime.getTime())
+          ? snapshotTime
+          : new Date();
       this.setConnectionStatus(true);
       this.updateHeader(snapshot);
       this.renderGlobalScene(snapshot);
@@ -312,6 +318,7 @@ class RollingScreenController {
   renderGlobalScene(snapshot) {
     this.renderRegions(snapshot);
     this.renderLeaders(snapshot);
+    this.renderUsFocus(snapshot);
   }
 
   renderRegions(snapshot) {
@@ -403,10 +410,50 @@ class RollingScreenController {
       rows.join("") || `<tr><td colspan="3">暂无数据</td></tr>`;
   }
 
+  renderUsFocus(snapshot) {
+    if (!this.elements.usFocus) return;
+    const usEntries = Object.entries(snapshot?.us_stocks ?? {})
+      .filter(
+        ([code, data]) =>
+          data && typeof data === "object" && this.isUsEquityCode(code)
+      )
+      .sort(
+        (a, b) =>
+          Math.abs(b[1].change_pct ?? 0) - Math.abs(a[1].change_pct ?? 0)
+      )
+      .slice(0, 5);
+
+    if (!usEntries.length) {
+      this.elements.usFocus.innerHTML = `<div class="board-item">暂无美股数据</div>`;
+      return;
+    }
+
+    this.elements.usFocus.innerHTML = usEntries
+      .map(([code, data]) => {
+        const pct = data.change_pct ?? 0;
+        const cls = pct >= 0 ? "positive" : "negative";
+        const price = this.isNumber(data.last)
+          ? `$${this.formatNumber(data.last)}`
+          : "--";
+        return `
+          <div class="board-item">
+            <div>
+              <div class="board-name">${data.display_name ?? data.name ?? code}</div>
+              <div class="board-meta">${code} · ${price}</div>
+            </div>
+            <div class="${cls}">${this.formatChange(pct)}%</div>
+          </div>
+        `;
+      })
+      .join("");
+  }
+
   renderASharesScene(snapshot) {
     this.renderCoreIndices(snapshot);
     this.renderMetrics(snapshot?.summary);
-    this.renderHeatmap(snapshot?.a_share_heatmap ?? []);
+    const boardHeatmap = this.buildBoardHeatmap(snapshot?.a_share_short_term);
+    const fallbackHeatmap = snapshot?.a_share_heatmap ?? [];
+    this.renderHeatmap(boardHeatmap.length ? boardHeatmap : fallbackHeatmap);
   }
 
   renderShortTermScene(snapshot) {
@@ -490,15 +537,16 @@ class RollingScreenController {
     if (this.elements.ratesList) {
       const orderedCodes = [
         "M0000017.SH",
-      "M0000025.SH",
-      "M0000007.SH",
-      "M0000001.SH",
-      "UST10Y.GBM",
-      "UST2Y.GBM",
-      "SOFR.IR",
-      "SONIA.IR",
-      "EFFR.IR",
-    ];
+        "M0000025.SH",
+        "M0000007.SH",
+        "M0000001.SH",
+        "UST10Y.GBM",
+        "UST2Y.GBM",
+        "UST5Y.GBM",
+        "SOFR.IR",
+        "SONIA.IR",
+        "EFFR.IR",
+      ];
       const rateEntries = orderedCodes
         .map((code) => [code, rates[code]])
         .filter(([, data]) => data && typeof data === "object");
@@ -642,7 +690,7 @@ class RollingScreenController {
   renderAltScene(snapshot) {
     const crypto = snapshot?.crypto ?? {};
     const fx = snapshot?.fx ?? {};
-    const us = snapshot?.us_stocks ?? {};
+    const commodities = snapshot?.commodities ?? {};
 
     if (this.elements.altCrypto) {
       const cryptoEntries = Object.entries(crypto)
@@ -670,6 +718,34 @@ class RollingScreenController {
         : `<div class="loading-spinner">暂无数字资产数据</div>`;
     }
 
+    if (this.elements.altCommodities) {
+      const commodityEntries = Object.entries(commodities)
+        .filter(([, data]) => data && typeof data === "object")
+        .sort(
+          (a, b) =>
+            Math.abs(b[1].change_pct ?? 0) - Math.abs(a[1].change_pct ?? 0)
+        )
+        .slice(0, 5);
+
+      this.elements.altCommodities.innerHTML = commodityEntries.length
+        ? commodityEntries
+            .map(([code, data]) => {
+              const pct = data.change_pct ?? 0;
+              const cls = pct >= 0 ? "positive" : "negative";
+              return `
+                <div class="board-item">
+                  <div>
+                    <div class="board-name">${data.display_name ?? data.name ?? code}</div>
+                    <div class="board-meta">${code}</div>
+                  </div>
+                  <div class="${cls}">${this.formatChange(pct)}%</div>
+                </div>
+              `;
+            })
+            .join("")
+        : `<div class="board-item">暂无大宗/避险数据</div>`;
+    }
+
     if (this.elements.altFx) {
       const watchlist = ["USDCNH.FX", "USDCNY.EX", "EURUSD.FX", "USDJPY.FX", "USDX.FX", "GBPUSD.FX"];
       const fxEntries = watchlist
@@ -693,44 +769,16 @@ class RollingScreenController {
         : `<div class="loading-spinner">暂无外汇数据</div>`;
     }
 
-    if (this.elements.altUs) {
-      const usEntries = Object.entries(us)
-        .filter(([code, data]) => data && typeof data === "object" && this.isUsEquityCode(code))
-        .sort(
-          (a, b) =>
-            Math.abs(b[1].change_pct ?? 0) - Math.abs(a[1].change_pct ?? 0)
-        )
-        .slice(0, 5);
-
-      this.elements.altUs.innerHTML = usEntries.length
-        ? usEntries
-            .map(([code, data]) => {
-              const pct = data.change_pct ?? 0;
-              const cls = pct >= 0 ? "positive" : "negative";
-              return `
-                <div class="board-item">
-                  <div>
-                    <div class="board-name">${data.display_name ?? data.name ?? code}</div>
-                    <div class="board-meta">${code}</div>
-                  </div>
-                  <div class="${cls}">${this.formatChange(pct)}%</div>
-                </div>
-              `;
-            })
-            .join("")
-        : `<div class="board-item">暂无美股数据</div>`;
-    }
-
     if (this.elements.altSummary) {
       const btc = crypto["BTC.CC"];
       const eth = crypto["ETH.CC"];
-      const eurusd = fx["EURUSD.FX"];
-      const usdcnh = fx["USDCNH.FX"];
+      const gold = commodities["GC.CMX"];
+      const oil = commodities["CL.NYM"] ?? commodities["COIL.BR"];
       const cards = [
         { label: "BTC 24H", value: btc ? `${this.formatChange(btc.change_pct)}%` : "--" },
         { label: "ETH 24H", value: eth ? `${this.formatChange(eth.change_pct)}%` : "--" },
-        { label: "EURUSD", value: eurusd ? this.formatNumber(eurusd.last, 4) : "--" },
-        { label: "USDCNH", value: usdcnh ? this.formatNumber(usdcnh.last, 4) : "--" },
+        { label: "COMEX 黄金", value: gold ? `$${this.formatNumber(gold.last, 2)}` : "--" },
+        { label: "WTI/Brent", value: oil ? `$${this.formatNumber(oil.last, 2)}` : "--" },
       ];
 
       this.elements.altSummary.innerHTML = cards
@@ -845,6 +893,38 @@ class RollingScreenController {
     }
   }
 
+  buildBoardHeatmap(shortData = {}) {
+    const pools = [
+      ...(Array.isArray(shortData?.hot_boards) ? shortData.hot_boards : []),
+      ...(Array.isArray(shortData?.cold_boards) ? shortData.cold_boards : []),
+      ...(Array.isArray(shortData?.capital_boards) ? shortData.capital_boards : []),
+    ];
+
+    const seen = new Set();
+    const normalized = [];
+    pools.forEach((item) => {
+      const code = item?.code ?? item?.name;
+      if (!code || seen.has(code)) return;
+      const pctValue = this.isNumber(item?.pct_change)
+        ? item.pct_change
+        : this.isNumber(item?.change_pct)
+          ? item.change_pct
+          : null;
+      if (pctValue === null) return;
+      seen.add(code);
+      normalized.push({
+        code,
+        name: item.display_name ?? item.name ?? code,
+        pct_change: pctValue,
+      });
+    });
+
+    normalized.sort(
+      (a, b) => Math.abs(b.pct_change ?? 0) - Math.abs(a.pct_change ?? 0)
+    );
+    return normalized.slice(0, 8);
+  }
+
   renderHeatmap(heatmap = []) {
     if (!this.elements.heatmap) return;
     if (!heatmap.length) {
@@ -854,12 +934,17 @@ class RollingScreenController {
     }
 
     const cells = heatmap.slice(0, 8).map((item) => {
-      const cls = item.pct_change >= 0 ? "positive" : "negative";
+      const pct = this.isNumber(item?.pct_change)
+        ? item.pct_change
+        : this.isNumber(item?.change_pct)
+          ? item.change_pct
+          : null;
+      const cls = (pct ?? 0) >= 0 ? "positive" : "negative";
       return `
         <div class="heatmap-cell">
-          <div>${item.name}</div>
+          <div>${item.name ?? item.display_name ?? item.code ?? "--"}</div>
           <div class="heatmap-change ${cls}">
-            ${this.formatChange(item.pct_change)}%
+            ${this.formatChange(pct)}%
           </div>
         </div>
       `;
